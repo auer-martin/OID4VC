@@ -170,7 +170,7 @@ export interface AuthorizationResponsePayload {
   expires_in?: number
   state?: string
   id_token?: string
-  vp_token?: Array<W3CVerifiablePresentation | CompactSdJwtVc> | W3CVerifiablePresentation | CompactSdJwtVc
+  vp_token?: Array<W3CVerifiablePresentation | CompactSdJwtVc | string> | W3CVerifiablePresentation | CompactSdJwtVc | string
   presentation_submission?: PresentationSubmission
   verifiedData?: IPresentation | AdditionalClaims
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

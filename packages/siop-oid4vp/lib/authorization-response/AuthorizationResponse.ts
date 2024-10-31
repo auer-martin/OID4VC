@@ -1,29 +1,19 @@
-import { CredentialMapper, Hasher } from '@sphereon/ssi-types';
+import { CredentialMapper, Hasher } from '@sphereon/ssi-types'
 
-import { AuthorizationRequest, VerifyAuthorizationRequestOpts } from '../authorization-request';
-import { assertValidVerifyAuthorizationRequestOpts } from '../authorization-request/Opts';
-import { IDToken } from '../id-token';
-import {
-  AuthorizationResponsePayload,
-  ResponseType,
-  SIOPErrors,
-  VerifiedAuthorizationRequest,
-  VerifiedAuthorizationResponse
-} from '../types';
+import { AuthorizationRequest, VerifyAuthorizationRequestOpts } from '../authorization-request'
+import { assertValidVerifyAuthorizationRequestOpts } from '../authorization-request/Opts'
+import { IDToken } from '../id-token'
+import { AuthorizationResponsePayload, ResponseType, SIOPErrors, VerifiedAuthorizationRequest, VerifiedAuthorizationResponse } from '../types'
 
 import {
   assertValidVerifiablePresentations,
   extractNonceFromWrappedVerifiablePresentation,
-  extractPresentationsFromAuthorizationResponse,
-  verifyPresentations
-} from './OpenID4VP';
-import { assertValidResponseOpts } from './Opts';
-import { createResponsePayload } from './Payload';
-import {
-  AuthorizationResponseOpts,
-  PresentationDefinitionWithLocation,
-  VerifyAuthorizationResponseOpts
-} from './types';
+  extractPresentationsFromVpToken,
+  verifyPresentations,
+} from './OpenID4VP'
+import { assertValidResponseOpts } from './Opts'
+import { createResponsePayload } from './Payload'
+import { AuthorizationResponseOpts, PresentationDefinitionWithLocation, VerifyAuthorizationResponseOpts } from './types'
 
 export class AuthorizationResponse {
   private readonly _authorizationRequest?: AuthorizationRequest | undefined
@@ -134,9 +124,11 @@ export class AuthorizationResponse {
     })
 
     if (hasVpToken) {
-      const wrappedPresentations = await extractPresentationsFromAuthorizationResponse(response, {
-        hasher: verifyOpts.hasher,
-      })
+      const wrappedPresentations = response.payload.vp_token
+        ? await extractPresentationsFromVpToken(response.payload.vp_token, {
+            hasher: verifyOpts.hasher,
+          })
+        : []
 
       await assertValidVerifiablePresentations({
         presentationDefinitions,
@@ -144,9 +136,9 @@ export class AuthorizationResponse {
         verificationCallback: verifyOpts.verification.presentationVerificationCallback,
         opts: {
           ...responseOpts.presentationExchange,
-          hasher: verifyOpts.hasher
-        }
-      });
+          hasher: verifyOpts.hasher,
+        },
+      })
     }
 
     return response
@@ -167,7 +159,7 @@ export class AuthorizationResponse {
 
     // Gather all nonces
     const allNonces = new Set<string>()
-    if (oid4vp) allNonces.add(oid4vp.nonce)
+    if (oid4vp && oid4vp.nonce) allNonces.add(oid4vp.nonce)
     if (verifiedIdToken) allNonces.add(verifiedIdToken.payload.nonce)
     if (merged.nonce) allNonces.add(merged.nonce)
 
@@ -222,7 +214,7 @@ export class AuthorizationResponse {
   public async mergedPayloads(opts?: { consistencyCheck?: boolean; hasher?: Hasher }): Promise<AuthorizationResponsePayload> {
     let nonce: string | undefined = this._payload.nonce
     if (this._payload?.vp_token) {
-      const presentations = await extractPresentationsFromAuthorizationResponse(this, opts)
+      const presentations = this.payload.vp_token ? await extractPresentationsFromVpToken(this.payload.vp_token, opts) : []
       const presentationsArray = Array.isArray(presentations) ? presentations : [presentations]
 
       // We do not verify them, as that is done elsewhere. So we simply can take the first nonce
@@ -230,11 +222,11 @@ export class AuthorizationResponse {
       nonce = presentationsArray
         // FIXME toWrappedVerifiablePresentation() does not extract the nonce yet from mdocs.
         // Either it's not availble or we or not reading the SessionTranscript yet
-        .filter(presentation => !CredentialMapper.isWrappedMdocPresentation(presentation))
+        .filter((presentation) => !CredentialMapper.isWrappedMdocPresentation(presentation))
         .map(extractNonceFromWrappedVerifiablePresentation)
-        .find(nonce => nonce !== undefined);
+        .find((nonce) => nonce !== undefined)
 
-      if(!nonce && !this._idToken && presentationsArray.some(presentation => CredentialMapper.isWrappedMdocPresentation(presentation))) {
+      if (!nonce && !this._idToken && presentationsArray.some((presentation) => CredentialMapper.isWrappedMdocPresentation(presentation))) {
         nonce = 'mdoc' // FIXME toWrappedVerifiablePresentation() does not extract the nonce yet from mdocs.
       }
     }
